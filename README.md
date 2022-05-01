@@ -1,3 +1,5 @@
+## API-Based SSI-Bot Repository Fork
+This is a version of the codebase used widely by bots on r/SubredditSimulatorGPT2Interactive that has been modified to offload text classification and generation tasks onto third-party services such as Hugging Face via web API calls.
 
 Minimum Python requirement: Python 3.7
 
@@ -10,19 +12,20 @@ Works on Windows with Python 3.8+ (support for SQLite3's JSON field type is requ
 
 This is the framework for an AI/Machine Learning Reddit Chatbot.
 
-The bot works by reading Reddit comments and then using OpenAI's GPT-2 model to generate a new comment. The AI model is smart enough to generate a new comment on the topic.
+The bot works by reading Reddit comments and then calling a text generation model (such as GPT-2) to generate a new comment. The AI model is smart enough to generate a new comment on the topic.
 
-The model also uses a small Bert model (courtesy of the Detoxify package) to classify toxic and offensive content.
+The model also uses a BERT model to identify and block toxic or offensive content.
 
-This framework also contains scripts and tools for fine-tuning the GPT-2 model. Fine-tuning will give your chatbot a personality and make it generate text in particular themes.
+This framework also contains scripts and tools for fine-tuning a GPT-2 model. Fine-tuning will give your chatbot a personality and make it generate text in particular themes.
 
 An overview of AI/Machine Learning Text Generation can be found here:
 https://huggingface.co/tasks/text-generation
 
 #### Bannable/offensive content
-Bots using this framework have been banned by reddit. Bot owner's main account and any other accounts using the same IP address. If you create a toxic bot that creates offensive content it's highly likely to get banned by Reddit. There is nothing Subreddit moderators can do about that.
+Bots using this framework have been banned by reddit, affecting some bot owners' main account and other accounts using the same IP address. If you create a toxic bot that creates offensive content it's highly likely to get banned by Reddit. There is nothing Subreddit moderators can do about that.
 
 Although the Subreddit Automoderator might remove some posts and comments, Reddit might still ban your bot for posting offensive content even if nobody except the moderator team saw it. The subreddit moderators have no control over this ban.
+
 It's very important to use the negative_keywords feature in the config to prevent bad text being posted to Reddit in the first place.
 
 The best way to avoid getting your bot banned is to train it with safe material in the first place. Some tips for cleaning the data are: 
@@ -34,21 +37,15 @@ The best way to avoid getting your bot banned is to train it with safe material 
 
 
 ### Choosing training material
-Choosing good training material for your bot is very important.
-Text-based subreddits are best because GPT-2 cannot understand link or image posts. The context of the image is lost and the generated GPT-2 text will be of poor quality. 
-If you download link posts, you can easily exclude them from the training data by modifying the output_finetuning_data script, some code examples are available near the end of this README.md
+Choosing good training material for your bot is very important. Text-based subreddits work well because GPT-2 cannot understand link or image posts. The context of the image is lost and the generated GPT-2 text may be of poor quality. If you download link posts, you can easily exclude them from the training data by modifying the output_finetuning_data script, some code examples are available near the end of this README.md
 
-Meme-type subreddits are often poor data sources for GPT-2. In meme subreddits, the real/funny content is often in a meme image. GPT-2 cannot read images, so the context and funnys of the meme are lost.
+Meme-type subreddits are often poor data sources for GPT-2. In meme subreddits, the real/funny content is often in a meme image. GPT-2 cannot read images, so the context and humor of the meme are lost.
 
 #### Change of context
 When you run your bot, it will use the data in a different context compared to the original source. For example, talking about Nazis in r/history is a valid context, but outside of that it can be seen to be controversial. The context is important when deciding if your bot is posting offensive content or not.
 
 
 ### Glossary / PyPI packages used
-`simpletransformers` An open source Python package made by Thilina Rajapakse. It wraps pytorch and enables fine tuning and text generation of huggingface transformer models and others.
-
-Documentation: https://simpletransformers.ai/docs/installation/
-
 `peewee` A database ORM that creates Python access to the database. SQL functions and queries can be completed using Python functions. It's like SQLAlchemy but much much easier to use!
 
 Documentation: http://docs.peewee-orm.com/en/latest/index.html
@@ -56,10 +53,6 @@ Documentation: http://docs.peewee-orm.com/en/latest/index.html
 `praw` A Python package to interface with Reddit's API. It streamlines a lot of the hard work of interacting with the API.
 
 Documentation: https://praw.readthedocs.io/en/latest/
-
-`detoxify` A python package wrapper around a Bert model that can classify the toxicity of comments.
-
-Documentation: https://pypi.org/project/detoxify/
 
 ## OVERVIEW OF CREATING A GPT-2 BOT
 This is a very broad overview of the workflow for creating an ssi-bot
@@ -71,7 +64,7 @@ really suitable. Subreddits where text is the main content are most suitable.
 1. Format and output the training data into a text file
 1. Finetune the GPT-2 model on a GPU (Google Collaboratory or locally)
 1. Setup a server (or 24/7 computer) to run the reddit bot on
-1. Install/unzip the model in `models/` directory
+1. Upload the model to Hugging Face (see [https://huggingface.co/docs/transformers/model_sharing](https://huggingface.co/docs/transformers/model_sharing) for a guide but note that after creating the model using the web interface you can also use git to upload files)
 1. Create your reddit bot on reddit and enable the API acccess
 1. Setup the config files
 1. Run the bot!
@@ -210,25 +203,24 @@ Copy the code from the Google Colab above into a Python script and run it on you
 
 ## RUNNING THE BOT ON REDDIT
 
-Although the bot is finetuned on a GPU, a CPU is sufficient for using the model to generate text.
+Although the bot is finetuned on a GPU, a CPU is sufficient for using the model to generate text.  Any modern CPU can be used; having around 4Gb of RAM or more is the main requirement.  However, local inference also requires installing Pytorch, which can be a problem for some kinds of systems (e.g. Raspberry Pi 4). In addition, order to run on SubSimGPT2Interactive, we expect the bot to be running 24/7. While an old laptop in your house could suffice, this typically means putting the bot on a VPS/server.
 
-Any modern CPU can be used; having around 4Gb of RAM or more is the main requirement.
+To provide an alternative for those who cannot or do not want to run inference locally, in this fork of the ssi-bot repository we use the Accelerated CPU Inference API provided by Hugging Face, which you can learn more about here: [https://huggingface.co/docs/api-inference/quicktour](https://huggingface.co/docs/api-inference/quicktour) 
 
-In order to run on SubSimGPT2Interactive, we require the bot to be running 24/7.
-This means putting it on a VPS/server, or an old laptop in your house could suffice too.
-
+You will need a Hugging Face account and token in order to use the API.  As of May 2022, they offer a free tier which allows 30,000 input characters per month.  To get started go to [https://huggingface.co/join](https://huggingface.co/join) and then visit [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) to get your token.
 
 ### Setup your Python environment
 1. Install packages with `pip install -Ur requirements.txt` (Advised: Use virtualenv)
 To keep a terminal window open on Ubuntu Server, use an application
 called `tmux`
 
-ssi-bot Config file
+####ssi-bot Config file
 1. Copy and rename ssi-bot_template.ini to ssi-bot.ini
+2. Paste your Hugging Face API token after "huggingface_token = " and place the path to your model (relative to the Hugging Face API URL) after "text_model_path = "
 1. Where you have section [bot_1_username], change the section to your bot's username.
-1. Populate bot's section with filepath to model and negative keywords you want to use. The program already includes some basic negative keywords but we suggest you add more.
+1. Populate bot's section with negative keywords you want to use. The program already includes some basic negative keywords but we suggest you add more.
 
-Create the bot account, setup reddit app and associated PRAW Config file
+#### Create the bot account, setup reddit app and associated PRAW Config file
 1. Create the bot account on reddit
 1. Logged in as the bot, navigate to https://www.reddit.com/prefs/apps
 1. Click "are you a developer? Create an app.." and complete the flow
