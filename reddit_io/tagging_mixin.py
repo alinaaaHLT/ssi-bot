@@ -8,221 +8,260 @@ import codecs
 
 from praw.models import Comment as praw_Comment
 
+import http.client, urllib.request, urllib.parse, urllib.error, base64
+import json
+
+
+
+
 
 class TaggingMixin():
-	"""
-	This mixin contains all the logic for tagging comments,
-	It is abstracted so that users can update this code on their fork,
-	while taking updates on the main classes.
-	"""
+    """
+    This mixin contains all the logic for tagging comments,
+    It is abstracted so that users can update this code on their fork,
+    while taking updates on the main classes.
+    """
 
-	_link_submission_start_tag = '<|sols|>'
-	_selftext_submission_start_tag = '<|soss|>'
+    _link_submission_start_tag = '<|sols|>'
+    _selftext_submission_start_tag = '<|soss|>'
 
-	_title_start_tag = '<|sot|>'
-	_selftext_start_tag = '<|sost|>'
+    _title_start_tag = '<|sot|>'
+    _selftext_start_tag = '<|sost|>'
 
-	_reply_start_tag = '<|sor|>'
-	_reply_end_tag = '<|eor|>'
+    _reply_start_tag = '<|sor|>'
+    _reply_end_tag = '<|eor|>'
 
-	_end_tag = '<|'
+    _end_tag = '<|'
 
-	def get_reply_tag(self, praw_thing, bot_username, use_reply_sense):
-		"""
-		Get the reply tag to use.
-		The model will generate text after this reply tag.
+    def describe_image(self,url):
+        # Settings below for Azure vision
+        headers = {
+            # Request headers
+            'Content-Type': 'application/json',
+            'Ocp-Apim-Subscription-Key': self._config['DEFAULT'].get('azure_token', None),
+        }
 
-		*This section is customisable for your own bot and how it has been finetuned*
-		"""
-		if use_reply_sense:
-			if isinstance(praw_thing, praw_Comment):
-				# Need this praw_Comment check for message replies
-				if praw_thing.submission:
-					# The submission was by the bot so use special tag
-					if praw_thing.submission.author.name.lower() == bot_username.lower():
-						return '<|soopr|>'
-				if praw_thing.parent():
-					# if the parent's parent was by the author bot, use the own content tag
-					if praw_thing.parent().author.name.lower() == bot_username.lower():
-						return '<|soocr|>'
+        params = urllib.parse.urlencode({
+            # Request parameters
+            'maxCandidates': '1',
+            'language': 'en',
+            'model-version': 'latest',
+        })
+        caption = ''
+        try:
+            conn = http.client.HTTPSConnection('cb-vision-test.cognitiveservices.azure.com')
+            conn.request("POST", "/vision/v3.2/describe?%s" % params, '{"url":"'+url+'"}', headers)
+            response = conn.getresponse()
+            data = json.loads(response.read())
+            #print(data)
+            caption = 'A picture of ' + data['description']['captions'][0]['text']
+            conn.close()
+            print("Caption: "+caption)
+        except Exception as e:
+            print(e)
+        return caption
 
-		# It's just a straight reply
-		return self._reply_start_tag
+    def get_reply_tag(self, praw_thing, bot_username, use_reply_sense):
+        """
+        Get the reply tag to use.
+        The model will generate text after this reply tag.
 
-	def _get_random_new_submission_tag(self, subreddit, use_reply_sense):
-		# random is already seeded in reddit_io init
-		random_value = random.random()
+        *This section is customisable for your own bot and how it has been finetuned*
+        """
+        if use_reply_sense:
+            if isinstance(praw_thing, praw_Comment):
+                # Need this praw_Comment check for message replies
+                if praw_thing.submission:
+                    # The submission was by the bot so use special tag
+                    if praw_thing.submission.author.name.lower() == bot_username.lower():
+                        return '<|soopr|>'
+                if praw_thing.parent():
+                    # if the parent's parent was by the author bot, use the own content tag
+                    if praw_thing.parent().author.name.lower() == bot_username.lower():
+                        return '<|soocr|>'
 
-		tag = ''
+        # It's just a straight reply
+        return self._reply_start_tag
 
-		if random_value < self._image_post_frequency:
-			# Make a link (image) post
-			tag += '<|sols'
-		else:
-			# Make a text post
-			tag += '<|soss'
+    def _get_random_new_submission_tag(self, subreddit, use_reply_sense):
+        # random is already seeded in reddit_io init
+        random_value = random.random()
 
-		if use_reply_sense:
-			tag += f' r/{subreddit}|>'
-		else:
-			tag += '|>'
+        tag = ''
 
-		return tag + self._title_start_tag
+        if random_value < self._image_post_frequency:
+            # Make a link (image) post
+            tag += '<|sols'
+        else:
+            # Make a text post
+            tag += '<|soss'
 
-	def tag_submission(self, praw_thing, use_reply_sense=False):
+        # if use_reply_sense:
+        #     tag += f' r/{subreddit}|>'
+        # else:
+        #     tag += '|>'
 
-		tagged_text = ""
+        return tag + self._title_start_tag
 
-		if praw_thing.is_self:
-			tagged_text += "<|soss"
-		else:
-			tagged_text += "<|sols"
+    def tag_submission(self, praw_thing, use_reply_sense=False):
 
-		if use_reply_sense:
-			tagged_text += f" r/{praw_thing.subreddit}|>"
-		else:
-			tagged_text += "|>"
+        tagged_text = ""
 
-		# prepend the tagged text
-		if praw_thing.is_self:
+        if praw_thing.is_self:
+            tagged_text += "<|soss"
+        else:
+            tagged_text += "<|sols"
 
-			selftext = praw_thing.selftext
+        # if use_reply_sense:
+        #     tagged_text += f" r/{praw_thing.subreddit}|>"
+        # else:
+        #     tagged_text += "|>"
 
-			if hasattr(praw_thing, 'poll_data'):
-				# The submission has a poll - extract that data
-				for option in praw_thing.poll_data.options:
-					# Replicate unordered list markdown,
-					# appeding it to the end of the selftext
-					selftext += f" - {option.text}"
+        # prepend the tagged text
+        if praw_thing.is_self:
 
-			# selftext submission
-			tagged_text += f"<|sot|>{praw_thing.title}<|eot|><|sost|>{selftext}<|eost|>"
+            selftext = praw_thing.selftext
 
-		else:
-			# it's a link submission
-			tagged_text += f"<|sot|>{praw_thing.title}<|eot|><|sol|><|eol|>"
+            if hasattr(praw_thing, 'poll_data'):
+                # The submission has a poll - extract that data
+                for option in praw_thing.poll_data.options:
+                    # Replicate unordered list markdown,
+                    # appeding it to the end of the selftext
+                    selftext += f" - {option.text}"
 
-		return tagged_text
+            # selftext submission
+            tagged_text += f"<|sot|>{praw_thing.title}<|eot|><|sost|>{selftext}<|eost|>"
 
-	def tag_comment(self, praw_thing, use_reply_sense=False):
-		if use_reply_sense:
+        else:
+            # it's a link submission - attempt image recognition
+            alt_text = self.describe_image(f"{praw_thing.url}")
+            logging.info("IMAGE CAPTION: "+alt_text)
+            if alt_text == '':
+                tagged_text += f"<|sot|>{praw_thing.title}<|eot|><|sol|><|eol|>"
+            else:
+                tagged_text = f"<|sols|><|sot|>{praw_thing.title}<|eot|><|sost|>"+alt_text+"<|eost|>"
 
-			if praw_thing.submission.author.name == praw_thing.author:
-				return f'<|soopr u/{praw_thing.author}|>{praw_thing.body}<|eoopr|>'
+        return tagged_text
 
-			parent_parent = None
-			try:
-				parent_parent = praw_thing.parent().parent()
-				if parent_parent.author.name == praw_thing.author:
-					return f'<|soocr u/{praw_thing.author}|>{praw_thing.body}<|eoocr|>'
-			except:
-				# Exception will be raised if there are not two parents
-				pass
+    def tag_comment(self, praw_thing, use_reply_sense=False):
+        if use_reply_sense:
 
-			return f'<|sor u/{praw_thing.author}|>{praw_thing.body}<|eor|>'
+            if praw_thing.submission.author.name == praw_thing.author:
+                return f'<|soopr u/{praw_thing.author}|>{praw_thing.body}<|eoopr|>'
 
-		else:
-			return f'<|sor|>{praw_thing.body}<|eor|>'
+            parent_parent = None
+            try:
+                parent_parent = praw_thing.parent().parent()
+                if parent_parent.author.name == praw_thing.author:
+                    return f'<|soocr u/{praw_thing.author}|>{praw_thing.body}<|eoocr|>'
+            except:
+                # Exception will be raised if there are not two parents
+                pass
 
-	def tag_message(self, praw_thing, use_reply_sense=False):
+            return f'<|sor u/{praw_thing.author}|>{praw_thing.body}<|eor|>'
 
-		tagged_text = ""
+        else:
+            return f'<|sor|>{praw_thing.body}<|eor|>'
 
-		if not praw_thing.parent_id:
-			# If parent_id property is None then it is the first message of the chain
-			tagged_text += f'<|sot>{praw_thing.subject}<|eot|>'
+    def tag_message(self, praw_thing, use_reply_sense=False):
 
-		if use_reply_sense:
-			tagged_text += f'<|soocr|>{praw_thing.body}<|eoocr|>'
-		else:
-			tagged_text += f'<|sor|>{praw_thing.body}<|eor|>'
+        tagged_text = ""
 
-		return tagged_text
+        if not praw_thing.parent_id:
+            # If parent_id property is None then it is the first message of the chain
+            tagged_text += f'<|sot>{praw_thing.subject}<|eot|>'
 
-	def extract_reply_from_generated_text(self, prompt, generated_text):
+        if use_reply_sense:
+            tagged_text += f'<|soocr|>{praw_thing.body}<|eoocr|>'
+        else:
+            tagged_text += f'<|sor|>{praw_thing.body}<|eor|>'
 
-		# remove any cruft
-		# generated_text = generated_text.replace('&amp;#x200B;\n', '')
+        return tagged_text
 
-		# find the first instance of the end-of-comment tag, starting from the end of the prompt
-		index_of_truncate = generated_text.find(self._end_tag, len(prompt))
+    def extract_reply_from_generated_text(self, prompt, generated_text):
 
-		if index_of_truncate == -1:
-			# the original truncate tag couldn't be found,
-			# but we'll still try and truncate the string at the last line break (end of paragraph)
-			# so that the text still looks clean.
-			index_of_truncate = generated_text.rfind("\\n")
+        # remove any cruft
+        # generated_text = generated_text.replace('&amp;#x200B;\n', '')
 
-		if index_of_truncate == -1:
-			# in case trained model do not output tags and put lot !!!!! at the end,
-			# This change allows this messages without need of end tags
-			index_of_truncate = generated_text.find("!!!!")
+        # find the first instance of the end-of-comment tag, starting from the end of the prompt
+        index_of_truncate = generated_text.find(self._end_tag, len(prompt))
 
-		if index_of_truncate == -1:
-			# still nothing could be found so just skip this one
-			# if this is hit often, increase the length of the generated text
-			logging.info("Truncate string not found")
-			return {}
+        if index_of_truncate == -1:
+            # the original truncate tag couldn't be found,
+            # but we'll still try and truncate the string at the last line break (end of paragraph)
+            # so that the text still looks clean.
+            index_of_truncate = generated_text.rfind("\\n")
 
-		# extract the text from between the prompt and the truncate point
-		reply_body = generated_text[len(prompt):index_of_truncate]
-		if reply_body:
-			return {'body': self._decode_generated_text(reply_body)}
+        if index_of_truncate == -1:
+            # in case trained model do not output tags and put lot !!!!! at the end,
+            # This change allows this messages without need of end tags
+            index_of_truncate = generated_text.find("!!!!")
 
-		# Return nothing
-		return {}
+        if index_of_truncate == -1:
+            # still nothing could be found so just skip this one
+            # if this is hit often, increase the length of the generated text
+            logging.info("Truncate string not found")
+            return {}
 
-	def extract_title_from_generated_text(self, generated_text):
+        # extract the text from between the prompt and the truncate point
+        reply_body = generated_text[len(prompt):index_of_truncate]
+        if reply_body:
+            return {'body': self._decode_generated_text(reply_body)}
 
-		idx_title_start = generated_text.find(self._title_start_tag)
-		idx_title_end = generated_text.find(self._end_tag, (idx_title_start + len(self._title_start_tag)))
+        # Return nothing
+        return {}
 
-		if idx_title_start == -1 or idx_title_end == -1:
-			# There must be at least a complete title to make a submission
-			return None
+    def extract_title_from_generated_text(self, generated_text):
 
-		title_text = generated_text[idx_title_start + len(self._title_start_tag):idx_title_end]
+        idx_title_start = generated_text.find(self._title_start_tag)
+        idx_title_end = generated_text.find(self._end_tag, (idx_title_start + len(self._title_start_tag)))
 
-		if (0 < len(title_text) < 300):
-			# Validate the title length is within reddit's range
-			return self._decode_generated_text(title_text)
+        if idx_title_start == -1 or idx_title_end == -1:
+            # There must be at least a complete title to make a submission
+            return None
 
-	def extract_selftext_from_generated_text(self, generated_text):
+        title_text = generated_text[idx_title_start + len(self._title_start_tag):idx_title_end]
 
-		idx_st_start = generated_text.find(self._selftext_start_tag)
-		idx_st_end = generated_text.find(self._end_tag, (idx_st_start + len(self._selftext_start_tag)))
+        if (0 < len(title_text) < 300):
+            # Validate the title length is within reddit's range
+            return self._decode_generated_text(title_text)
 
-		if idx_st_start == -1 or idx_st_end == -1:
-			return None
+    def extract_selftext_from_generated_text(self, generated_text):
 
-		selftext_text = generated_text[idx_st_start + len(self._selftext_start_tag):idx_st_end]
-		return self._decode_generated_text(selftext_text)
+        idx_st_start = generated_text.find(self._selftext_start_tag)
+        idx_st_end = generated_text.find(self._end_tag, (idx_st_start + len(self._selftext_start_tag)))
 
-	def extract_submission_from_generated_text(self, generated_text):
+        if idx_st_start == -1 or idx_st_end == -1:
+            return None
 
-		return_dict = {}
+        selftext_text = generated_text[idx_st_start + len(self._selftext_start_tag):idx_st_end]
+        return self._decode_generated_text(selftext_text)
 
-		# remove any cruft
-		# generated_text = generated_text.replace('&amp;#x200B;\n', '')
+    def extract_submission_from_generated_text(self, generated_text):
 
-		title = self.extract_title_from_generated_text(generated_text)
+        return_dict = {}
 
-		if not title:
-			return {}
-		else:
-			# The title is ok, add it to the dict to return
-			return_dict['title'] = title
+        # remove any cruft
+        # generated_text = generated_text.replace('&amp;#x200B;\n', '')
 
-		selftext = self.extract_selftext_from_generated_text(generated_text)
+        title = self.extract_title_from_generated_text(generated_text)
 
-		if selftext:
-			return_dict['selftext'] = selftext
+        if not title:
+            return {}
+        else:
+            # The title is ok, add it to the dict to return
+            return_dict['title'] = title
 
-		return return_dict
+        selftext = self.extract_selftext_from_generated_text(generated_text)
 
-	def remove_tags_from_string(self, input_string):
-		# Removes any <|sor u/user|>, <|sost|> etc from a string
-		return re.sub(r'(\<\|[\w\/ ]*\|\>)', ' ', input_string).strip()
+        if selftext:
+            return_dict['selftext'] = selftext
 
-	def _decode_generated_text(self, text):
-		return ftfy.fix_text(codecs.decode(text, "unicode_escape"))
+        return return_dict
+
+    def remove_tags_from_string(self, input_string):
+        # Removes any <|sor u/user|>, <|sost|> etc from a string
+        return re.sub(r'(\<\|[\w\/ ]*\|\>)', ' ', input_string).strip()
+
+    def _decode_generated_text(self, text):
+        return ftfy.fix_text(codecs.decode(text, "unicode_escape"))

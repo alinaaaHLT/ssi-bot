@@ -15,7 +15,7 @@ def query(payload, API_URL, headers):
             break
         else:
             # Not connected to internet maybe?
-            logging.info('Unsuccessful request, status code '+ str(response.status_code))
+            logging.info('Unsuccessful toxicity request, status code '+ str(response.status_code))
             if response.status_code==400:
                 print(headers)
                 print(payload)
