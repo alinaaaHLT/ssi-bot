@@ -20,6 +20,8 @@ config = ConfigParser()
 config.read('dataset.ini')
 
 verbose = False
+writeToDB = True
+addExistingToDB = False
 
 if config['DEFAULT']['verbose']:
 	verbose = config['DEFAULT'].getboolean('verbose')
@@ -63,41 +65,43 @@ def write_to_database(q):
 
 		data = None
 
-		with open(json_filepath, 'r') as f:
-			data = json.load(f)
+		try:
+			with open(json_filepath, 'r') as f:
+				data = json.load(f)
 
-		for json_item in data['data']:
+			for json_item in data['data']:
 
-			if 'body' in json_item:
-				# if 'body' is present then assume it's a comment
+				if 'body' in json_item:
+					# if 'body' is present then assume it's a comment
 
-				db_record = db_Comment.get_or_none(db_Comment.id == json_item['id'])
+					db_record = db_Comment.get_or_none(db_Comment.id == json_item['id'])
 
-				if not db_record:
+					if not db_record:
 
-					json_item['body'] = clean_text(json_item['body'])
+						json_item['body'] = clean_text(json_item['body'])
 
-					# Try to detect whether the comment is a URL only with no text so we can ignore it later
-					json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(')'))\
-							or ('http' in json_item['body'].lower() and ' ' not in json_item['body'])
+						# Try to detect whether the comment is a URL only with no text so we can ignore it later
+						json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(')'))\
+								or ('http' in json_item['body'].lower() and ' ' not in json_item['body'])
 
 
-					db_record = db_Comment.create(**json_item)
-					if verbose:
-						print(f"comment {json_item['id']} written to database")
+						db_record = db_Comment.create(**json_item)
+						if verbose:
+							print(f"comment {json_item['id']} written to database")
 
-			elif 'selftext' in json_item:
+				elif 'selftext' in json_item:
 				# if 'selftext' is present then assume it's a submission
-				db_record = db_Submission.get_or_none(db_Submission.id == json_item['id'])
+					db_record = db_Submission.get_or_none(db_Submission.id == json_item['id'])
 
-				if not db_record:
+					if not db_record:
 
-					json_item['selftext'] = clean_text(json_item['selftext'])
+						json_item['selftext'] = clean_text(json_item['selftext'])
 
-					db_record = db_Submission.create(**json_item)
-					if verbose:
-						print(f"submission {json_item['id']} written to database")
-
+						db_record = db_Submission.create(**json_item)
+						if verbose:
+							print(f"submission {json_item['id']} written to database")
+		except ValueError:  # includes simplejson.decoder.JSONDecodeError
+				print('Decoding JSON has failed')
 		q.task_done()
 
 
@@ -112,8 +116,8 @@ def main():
 
 	# The worker thread will run in the background copying files into the database
 	# even while we're still downloading new ones (saves time)
-	threading.Thread(target=write_to_database, args=(q,), daemon=True).start()
-
+	if writeToDB:
+		threading.Thread(target=write_to_database, args=(q,), daemon=True).start()
 	# dataset subreddits, start date, and end date
 	training_subreddits = []
 	start_date = '2018-01-01'
@@ -136,6 +140,10 @@ def main():
 		submission_limit = int(config['DEFAULT']['submission_limit'])
 	if config['DEFAULT']['min_comments']:
 		min_comments = int(config['DEFAULT']['min_comments'])
+	if config['DEFAULT']['writeToDB']:
+		WriteDB = config['DEFAULT'].getboolean('WriteDB')
+	if config['DEFAULT']['addExistingToDB']:
+		addExistingToDB = config['DEFAULT'].getboolean('addExistingToDB')
 
 	# reassign date variables to datetime object
 	start_date = datetime.fromisoformat(start_date)
@@ -198,6 +206,8 @@ def main():
 			else:
 				if verbose:
 					print(f"{submission_output_path} file exists on the disk, skipping download")
+				if addExistingToDB:
+					submission_success = True
 				# The file already exists, but we'll go forwards and
 				# check the comment files, download if required
 
