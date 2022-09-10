@@ -209,7 +209,7 @@ def main():
 					print(f"{submission_output_path} file exists on the disk, skipping download")
 				# The file already exists, but we'll go forwards and
 				# check the comment files, download if required
-			if not os.path.isfile(submission_output_path):
+			if os.path.isfile(submission_output_path):
 				submission_success = True
 			if not submission_success: continue
 				
