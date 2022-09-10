@@ -66,6 +66,7 @@ def write_to_database(q):
 		data = None
 
 		try:
+			#Fixes a bug that stops the code when there is an empty/invalid JSON leftover
 			with open(json_filepath, 'r') as f:
 				data = json.load(f)
 
@@ -100,7 +101,7 @@ def write_to_database(q):
 						db_record = db_Submission.create(**json_item)
 						if verbose:
 							print(f"submission {json_item['id']} written to database")
-		except ValueError:  # includes simplejson.decoder.JSONDecodeError
+		except ValueError:
 				print('Decoding JSON has failed')
 		q.task_done()
 
