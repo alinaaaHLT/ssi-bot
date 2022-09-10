@@ -118,6 +118,7 @@ def main():
 	# The worker thread will run in the background copying files into the database
 	# even while we're still downloading new ones (saves time)
 	if writeToDB:
+		#Allows to disable writing to DB, useful for remote download
 		threading.Thread(target=write_to_database, args=(q,), daemon=True).start()
 	# dataset subreddits, start date, and end date
 	training_subreddits = []
@@ -208,6 +209,7 @@ def main():
 				if verbose:
 					print(f"{submission_output_path} file exists on the disk, skipping download")
 				if addExistingToDB:
+					#Without this already existing JSON data won't be added to the DB
 					submission_success = True
 				# The file already exists, but we'll go forwards and
 				# check the comment files, download if required
