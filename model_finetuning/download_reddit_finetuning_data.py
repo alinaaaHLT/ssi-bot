@@ -21,7 +21,7 @@ config.read('dataset.ini')
 
 verbose = False
 writeToDB = True
-
+addExistingToDB = False
 
 if config['DEFAULT']['verbose']:
 	verbose = config['DEFAULT'].getboolean('verbose')
@@ -144,6 +144,8 @@ def main():
 		min_comments = int(config['DEFAULT']['min_comments'])
 	if config['DEFAULT']['writeToDB']:
 		WriteDB = config['DEFAULT'].getboolean('WriteDB')
+	if config['DEFAULT']['addExistingToDB']:
+		addExistingToDB = config['DEFAULT'].getboolean('addExistingToDB')
 
 
 	# reassign date variables to datetime object
@@ -209,8 +211,10 @@ def main():
 					print(f"{submission_output_path} file exists on the disk, skipping download")
 				# The file already exists, but we'll go forwards and
 				# check the comment files, download if required
-			if os.path.isfile(submission_output_path):
-				submission_success = True
+				if os.path.isfile(submission_output_path):
+					if addExistingToDB:
+						#Without this already existing JSON data won't be added to the DB
+						submission_success = True
 			if not submission_success: continue
 				
 			# Put the submission path into the queue to write into the database
