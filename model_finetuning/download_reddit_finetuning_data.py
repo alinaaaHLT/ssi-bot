@@ -21,7 +21,7 @@ config.read('dataset.ini')
 
 verbose = False
 writeToDB = True
-addExistingToDB = False
+
 
 if config['DEFAULT']['verbose']:
 	verbose = config['DEFAULT'].getboolean('verbose')
