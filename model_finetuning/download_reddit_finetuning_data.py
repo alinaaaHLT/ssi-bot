@@ -20,8 +20,7 @@ config = ConfigParser()
 config.read('dataset.ini')
 
 verbose = False
-writeToDB = True
-addExistingToDB = False
+
 
 if config['DEFAULT']['verbose']:
 	verbose = config['DEFAULT'].getboolean('verbose')
@@ -112,15 +111,6 @@ def main():
 
 	create_tables()
 
-	# Queue for the write to db thread to receive from
-	q = Queue()
-
-	# The worker thread will run in the background copying files into the database
-	# even while we're still downloading new ones (saves time)
-	if writeToDB:
-		#Allows to disable writing to DB, useful for remote download
-		threading.Thread(target=write_to_database, args=(q,), daemon=True).start()
-	# dataset subreddits, start date, and end date
 	training_subreddits = []
 	start_date = '2018-01-01'
 	end_date = '2021-08-09'
@@ -130,6 +120,10 @@ def main():
 	# Pushshift will only allow 100 per file, so use score/gilding/etc filtering to get the best quality submissions
 	# If you are combining multiple subreddits, you can reduce this number to reduce download time
 	submission_limit = 100
+
+	#Set bools for Server use
+	push_to_DB = True
+	push_existing_JSON_to_DB = False
 
 	# pull configs from dataset.ini
 	if config['DEFAULT']['start_date']:
@@ -142,11 +136,20 @@ def main():
 		submission_limit = int(config['DEFAULT']['submission_limit'])
 	if config['DEFAULT']['min_comments']:
 		min_comments = int(config['DEFAULT']['min_comments'])
-	if config['DEFAULT']['writeToDB']:
-		WriteDB = config['DEFAULT'].getboolean('WriteDB')
-	if config['DEFAULT']['addExistingToDB']:
-		addExistingToDB = config['DEFAULT'].getboolean('addExistingToDB')
+	if config['DEFAULT']['push_to_DB']:
+		push_to_DB = config['DEFAULT'].getboolean('push_to_DB')
+	if config['DEFAULT']['push_existing_JSON_to_DB']:
+		push_existing_JSON_to_DB = config['DEFAULT'].getboolean('push_existing_JSON_to_DB')
+	
+	if push_to_DB:
+		# Queue for the write to db thread to receive from
+		q = Queue()
+		# The worker thread will run in the background copying files into the database
+		# even while we're still downloading new ones (saves time)
 
+		#Allows to disable writing to DB, useful for remote download
+		threading.Thread(target=write_to_database, args=(q,), daemon=True).start()
+	# dataset subreddits, start date, and end date
 
 	# reassign date variables to datetime object
 	start_date = datetime.fromisoformat(start_date)
@@ -205,6 +208,7 @@ def main():
 						f.write(submission_response.text)
 
 					time.sleep(0.1)
+					
 
 			else:
 				if verbose:
@@ -212,11 +216,10 @@ def main():
 				# The file already exists, but we'll go forwards and
 				# check the comment files, download if required
 				if os.path.isfile(submission_output_path):
-					if addExistingToDB:
+					if push_existing_JSON_to_DB:
 						#Without this already existing JSON data won't be added to the DB
 						submission_success = True
 			if not submission_success: continue
-				
 			# Put the submission path into the queue to write into the database
 			q.put(submission_output_path)
 
