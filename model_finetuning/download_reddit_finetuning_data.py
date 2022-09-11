@@ -140,11 +140,13 @@ def main():
 		push_to_DB = config['DEFAULT'].getboolean('push_to_DB')
 	if config['DEFAULT']['push_existing_JSON_to_DB']:
 		push_existing_JSON_to_DB = config['DEFAULT'].getboolean('push_existing_JSON_to_DB')
-	
+
+	# Queue for the write to db thread to receive from
+	q = Queue()
+	# The worker thread will run in the background copying files into the database	
+
 	if push_to_DB:
-		# Queue for the write to db thread to receive from
-		q = Queue()
-		# The worker thread will run in the background copying files into the database
+
 		# even while we're still downloading new ones (saves time)
 
 		#Allows to disable writing to DB, useful for remote download
@@ -282,7 +284,8 @@ def main():
 
 						# Have to sleep a bit here or else pushshift will start to block our requests
 						time.sleep(0.05)
-
+				else:
+					print(f"Comment Output Path {comment_output_path}")
 				# Put it into the queue to write into the database
 				q.put(comment_output_path)
 
