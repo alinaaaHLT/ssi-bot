@@ -21,6 +21,7 @@ config.read('dataset.ini')
 
 verbose = False
 
+
 if config['DEFAULT']['verbose']:
 	verbose = config['DEFAULT'].getboolean('verbose')
 
@@ -63,41 +64,44 @@ def write_to_database(q):
 
 		data = None
 
-		with open(json_filepath, 'r') as f:
-			data = json.load(f)
+		try:
+			#Fixes a bug that stops the code when there is an empty/invalid JSON leftover
+			with open(json_filepath, 'r') as f:
+				data = json.load(f)
 
-		for json_item in data['data']:
+			for json_item in data['data']:
 
-			if 'body' in json_item:
-				# if 'body' is present then assume it's a comment
+				if 'body' in json_item:
+					# if 'body' is present then assume it's a comment
 
-				db_record = db_Comment.get_or_none(db_Comment.id == json_item['id'])
+					db_record = db_Comment.get_or_none(db_Comment.id == json_item['id'])
 
-				if not db_record:
+					if not db_record:
 
-					json_item['body'] = clean_text(json_item['body'])
+						json_item['body'] = clean_text(json_item['body'])
 
-					# Try to detect whether the comment is a URL only with no text so we can ignore it later
-					json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(')'))\
-							or ('http' in json_item['body'].lower() and ' ' not in json_item['body'])
+						# Try to detect whether the comment is a URL only with no text so we can ignore it later
+						json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(')'))\
+								or ('http' in json_item['body'].lower() and ' ' not in json_item['body'])
 
 
-					db_record = db_Comment.create(**json_item)
-					if verbose:
-						print(f"comment {json_item['id']} written to database")
+						db_record = db_Comment.create(**json_item)
+						if verbose:
+							print(f"comment {json_item['id']} written to database")
 
-			elif 'selftext' in json_item:
+				elif 'selftext' in json_item:
 				# if 'selftext' is present then assume it's a submission
-				db_record = db_Submission.get_or_none(db_Submission.id == json_item['id'])
+					db_record = db_Submission.get_or_none(db_Submission.id == json_item['id'])
 
-				if not db_record:
+					if not db_record:
 
-					json_item['selftext'] = clean_text(json_item['selftext'])
+						json_item['selftext'] = clean_text(json_item['selftext'])
 
-					db_record = db_Submission.create(**json_item)
-					if verbose:
-						print(f"submission {json_item['id']} written to database")
-
+						db_record = db_Submission.create(**json_item)
+						if verbose:
+							print(f"submission {json_item['id']} written to database")
+		except ValueError:
+				print('Decoding JSON has failed')
 		q.task_done()
 
 
@@ -107,14 +111,6 @@ def main():
 
 	create_tables()
 
-	# Queue for the write to db thread to receive from
-	q = Queue()
-
-	# The worker thread will run in the background copying files into the database
-	# even while we're still downloading new ones (saves time)
-	threading.Thread(target=write_to_database, args=(q,), daemon=True).start()
-
-	# dataset subreddits, start date, and end date
 	training_subreddits = []
 	start_date = '2018-01-01'
 	end_date = '2021-08-09'
@@ -124,6 +120,10 @@ def main():
 	# Pushshift will only allow 100 per file, so use score/gilding/etc filtering to get the best quality submissions
 	# If you are combining multiple subreddits, you can reduce this number to reduce download time
 	submission_limit = 100
+
+	#Set bools for Server use
+	push_to_DB = True
+	push_existing_JSON_to_DB = False
 
 	# pull configs from dataset.ini
 	if config['DEFAULT']['start_date']:
@@ -136,6 +136,22 @@ def main():
 		submission_limit = int(config['DEFAULT']['submission_limit'])
 	if config['DEFAULT']['min_comments']:
 		min_comments = int(config['DEFAULT']['min_comments'])
+	if config['DEFAULT']['push_to_DB']:
+		push_to_DB = config['DEFAULT'].getboolean('push_to_DB')
+	if config['DEFAULT']['push_existing_JSON_to_DB']:
+		push_existing_JSON_to_DB = config['DEFAULT'].getboolean('push_existing_JSON_to_DB')
+
+	# Queue for the write to db thread to receive from
+	q = Queue()
+	# The worker thread will run in the background copying files into the database	
+
+	if push_to_DB:
+
+		# even while we're still downloading new ones (saves time)
+
+		#Allows to disable writing to DB, useful for remote download
+		threading.Thread(target=write_to_database, args=(q,), daemon=True).start()
+	# dataset subreddits, start date, and end date
 
 	# reassign date variables to datetime object
 	start_date = datetime.fromisoformat(start_date)
@@ -194,15 +210,18 @@ def main():
 						f.write(submission_response.text)
 
 					time.sleep(0.1)
+					
 
 			else:
 				if verbose:
 					print(f"{submission_output_path} file exists on the disk, skipping download")
 				# The file already exists, but we'll go forwards and
 				# check the comment files, download if required
-
+				if os.path.isfile(submission_output_path):
+					if push_existing_JSON_to_DB:
+						#Without this already existing JSON data won't be added to the DB
+						submission_success = True
 			if not submission_success: continue
-
 			# Put the submission path into the queue to write into the database
 			q.put(submission_output_path)
 
@@ -265,7 +284,8 @@ def main():
 
 						# Have to sleep a bit here or else pushshift will start to block our requests
 						time.sleep(0.05)
-
+				else:
+					print(f"Comment Output Path {comment_output_path}")
 				# Put it into the queue to write into the database
 				q.put(comment_output_path)
 
