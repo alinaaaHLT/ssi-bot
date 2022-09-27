@@ -79,6 +79,7 @@ training_subreddits = []
 if config['DEFAULT']['training_subreddits']:
 	training_subreddits = config['DEFAULT']['training_subreddits'].split(',')
 
+training_subreddits=[x.lower() for x in training_subreddits]
 
 def tag_submission(sub):
 
