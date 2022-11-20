@@ -11,7 +11,7 @@ from utils import ROOT_DIR
 class ToxicityHelper():
 
 	_detoxify = None
-	_threshold_map = {'toxicity': 0.80, 'severe_toxicity': 0.05, 'obscene': 0.8, 'identity_attack': 0.4, 'insult': 0.4, 'threat': 0.3, 'sexual_explicit': 0.8}
+	_threshold_map = {'toxicity': 0.95, 'severe_toxicity': 0.80, 'obscene': 1, 'identity_attack': 0.4, 'insult': 0.8, 'threat': 0.3, 'sexual_explicit': 1}
 
 	def __init__(self, config_section='DEFAULT'):
 

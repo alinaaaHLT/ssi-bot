@@ -9,19 +9,28 @@ import difflib
 from configparser import ConfigParser
 from datetime import datetime, timedelta
 
-import praw
+import pbfaw as pbfaw
+import praw as praw
+from pbfaw.models import (Submission as pbfaw_Submission, Comment as pbfaw_Comment, Message as pbfaw_Message)
 from praw.models import (Submission as praw_Submission, Comment as praw_Comment, Message as praw_Message)
 from peewee import fn
 import pyimgur
 
 from .logic_mixin import LogicMixin
-
 from generators.text import default_text_generation_parameters
 
 from bot_db.db import Thing as db_Thing
 from utils.keyword_helper import KeywordHelper
 from utils.toxicity_helper import ToxicityHelper
 
+import logging
+
+handler = logging.StreamHandler()
+handler.setLevel(logging.DEBUG)
+#for logger_name in ("praw", "prawcore"):
+#    logger = logging.getLogger(logger_name)
+#    logger.setLevel(logging.DEBUG)
+#    logger.addHandler(handler)
 
 class RedditIO(threading.Thread, LogicMixin):
 	"""
@@ -82,6 +91,8 @@ class RedditIO(threading.Thread, LogicMixin):
 
 		self._submission_image_generator = self._config[self._bot_username].get('submission_image_generator', 'scraper')
 
+		self._platform = self._config[self._bot_username].get('platform', 'BotForum')
+
 		if self._submission_image_generator == 'scraper':
 			from generators.scraper import default_image_generation_parameters
 			self._default_image_generation_parameters = default_image_generation_parameters
@@ -111,19 +122,22 @@ class RedditIO(threading.Thread, LogicMixin):
 
 		# start a reddit instance
 		# this will automatically pick up the configuration from praw.ini
-		self._praw = praw.Reddit(self._bot_username, timeout=64)
+		if self._platform == "BotForum":
+			self._praw = pbfaw.Reddit(self._bot_username, timeout=64)
+		elif self._platform == "Reddit":
+			self._praw = praw.Reddit(self._bot_username, timeout=64)
 
 	def run(self):
 
 		# synchronize bot's own posts to the database
 		self.synchronize_bots_comments_submissions()
 
-		# pick up incoming submissions, comments etc from reddit and submit jobs for them
+		# pick up incoming submissions, comments etc. from reddit and submit jobs for them
 		while True:
 
 			try:
 				logging.info(f"Beginning to process inbox stream")
-				self.poll_inbox_stream()
+				#self.poll_inbox_stream()
 			except:
 				logging.exception("Exception occurred while processing the inbox streams")
 
@@ -159,13 +173,13 @@ class RedditIO(threading.Thread, LogicMixin):
 			time.sleep(120)
 
 	def poll_inbox_stream(self):
-
 		for praw_thing in self._praw.inbox.stream(pause_after=0):
 
 			if praw_thing is None:
 				break
-
-			if isinstance(praw_thing, praw_Message) and not self._inbox_replies_enabled:
+			#if praw_thing.submission.id == 'comments':
+			#	break
+			if isinstance(praw_thing, pbfaw_Message) and not self._inbox_replies_enabled:
 				# Skip if it's an inbox message and replies are disabled
 				continue
 
@@ -209,12 +223,17 @@ class RedditIO(threading.Thread, LogicMixin):
 		# Merge the streams in a single loop to DRY the code
 		for praw_thing in chain_listing_generators(submissions, comments):
 
+
+			if isinstance(praw_thing, dict):
+				praw_thing = self._praw.submission(url=praw_thing["data"]["permalink"])
+
+
 			# Check in the database to see if it already exists
 			record = self.is_praw_thing_in_database(praw_thing)
 
 			# If the thing is already in the database then we've already calculated a reply for it.
 			if not record:
-				thing_label = 'comment' if isinstance(praw_thing, praw_Comment) else 'submission'
+				thing_label = 'comment' if isinstance(praw_thing, pbfaw_Comment) else 'submission'
 				logging.info(f"New {thing_label} thing received {praw_thing.name} from {praw_thing.subreddit}")
 
 				if self._is_praw_thing_removed_or_deleted(praw_thing):
@@ -261,14 +280,14 @@ class RedditIO(threading.Thread, LogicMixin):
 
 			# Get the praw object of the original thing we are going to reply to
 			source_praw_thing = None
-
+			#print("Source Name:  "+post_job.source_name[:3])
 			if post_job.source_name[:3] == 't1_':
 				# Comment
 				source_praw_thing = self._praw.comment(post_job.source_name[3:])
-			elif post_job.source_name[:3] == 't3_':
+			elif post_job.source_name[:3] == 't7_':
 				# Submission
 				source_praw_thing = self._praw.submission(post_job.source_name[3:])
-			elif post_job.source_name[:3] == 't4_':
+			elif post_job.source_name[:3] == 't8_':
 				# Inbox message
 				source_praw_thing = self._praw.inbox.message(post_job.source_name[3:])
 
@@ -378,9 +397,9 @@ class RedditIO(threading.Thread, LogicMixin):
 			# Put the praw thing into the database so it's registered as a submitted job
 			self.insert_praw_thing_into_database(submission_praw_thing)
 
-			logging.info(f"Job {post_job.id} submission submitted successfully: https://www.reddit.com{submission_praw_thing.permalink}")
+			logging.info(f"Job {post_job.id} submission submitted successfully: https://botforum.net{submission_praw_thing.permalink}")
 
-		except praw.exceptions.RedditAPIException as e:
+		except pbfaw.exceptions.RedditAPIException as e:
 			if 'DOMAIN_BANNED' in str(e):
 				# DOMAIN_BANNED exception can occur when the domain of a url/link post is blacklisted by reddit
 				# 'Reset' the generated image and try again - it will use a different image next time.
@@ -403,9 +422,9 @@ class RedditIO(threading.Thread, LogicMixin):
 	def synchronize_bots_comments_submissions(self):
 		# at first run, pick up Bot's own recent submissions and comments
 		# to 'sync' the database and prevent duplicate replies
-
-		submissions = self._praw.redditor(self._praw.user.me().name).submissions.new(limit=20)
-		comments = self._praw.redditor(self._praw.user.me().name).comments.new(limit=100)
+		# CHANGE THIS BACK!!!!!!!!!!!!!!!
+		submissions = self._praw.redditor(self._praw.user.me().name).submissions.new(limit=1)
+		comments = self._praw.redditor(self._praw.user.me().name).comments.new(limit=1)
 
 		for praw_thing in chain_listing_generators(submissions, comments):
 
@@ -417,7 +436,7 @@ class RedditIO(threading.Thread, LogicMixin):
 				# Add the record into the database, with no chance of reply
 				record = self.insert_praw_thing_into_database(praw_thing)
 
-			if isinstance(praw_thing, praw_Comment):
+			if isinstance(praw_thing, pbfaw_Comment):
 				parent_record = self.is_praw_thing_in_database(praw_thing.parent())
 				if not parent_record:
 					# Insert the parent, too, to prevent another job being made.
@@ -434,12 +453,21 @@ class RedditIO(threading.Thread, LogicMixin):
 
 	def _get_name_for_thing(self, praw_thing):
 		# Infer the name for the thing without doing a network request
-		if isinstance(praw_thing, praw_Comment):
-			return f"t1_{praw_thing.id}"
-		if isinstance(praw_thing, praw_Submission):
-			return f"t3_{praw_thing.id}"
-		if isinstance(praw_thing, praw_Message):
-			return f"t4_{praw_thing.id}"
+		val = "BotForum"
+		if val == "BotForum":
+			if isinstance(praw_thing, pbfaw_Comment):
+				return f"t1_{praw_thing.id}"
+			if isinstance(praw_thing, pbfaw_Submission):
+				return f"t7_{praw_thing.id}"
+			if isinstance(praw_thing, pbfaw_Message):
+				return f"t8_{praw_thing.id}"
+		if val == "Reddit":
+			if isinstance(praw_thing, praw_Comment):
+				return f"t1_{praw_thing.id}"
+			if isinstance(praw_thing, praw_Submission):
+				return f"t3_{praw_thing.id}"
+			if isinstance(praw_thing, praw_Message):
+				return f"t4_{praw_thing.id}"
 
 	def insert_praw_thing_into_database(self, praw_thing, text_generation_parameters=None):
 
@@ -461,7 +489,7 @@ class RedditIO(threading.Thread, LogicMixin):
 		# Check that one has not been completed or in the process of, before submitting
 
 		pending_submissions = list(db_Thing.select(db_Thing).where(fn.Lower(db_Thing.subreddit) == subreddit.lower()).
-					where(db_Thing.source_name == 't3_new_submission').
+					where(db_Thing.source_name == 't7_new_submission').
 					where(db_Thing.bot_username == self._bot_username).
 					where(db_Thing.status <= 7).
 					where(db_Thing.created_utc > (datetime.utcnow() - timedelta(hours=24))))
@@ -471,7 +499,7 @@ class RedditIO(threading.Thread, LogicMixin):
 			return
 
 		recent_submissions = list(db_Thing.select(db_Thing).where(fn.Lower(db_Thing.subreddit) == subreddit.lower()).
-					where(db_Thing.source_name.startswith('t3_')).
+					where(db_Thing.source_name.startswith('t7_')).
 					where(db_Thing.author == self._bot_username).
 					where(db_Thing.status == 8).
 					where(db_Thing.created_utc > (datetime.utcnow() - timedelta(hours=hourly_frequency))))
@@ -485,7 +513,7 @@ class RedditIO(threading.Thread, LogicMixin):
 
 		new_submission_thing = {}
 
-		new_submission_thing['source_name'] = 't3_new_submission'
+		new_submission_thing['source_name'] = 't7_new_submission'
 		new_submission_thing['bot_username'] = self._bot_username
 		new_submission_thing['author'] = self._bot_username
 		new_submission_thing['subreddit'] = subreddit
@@ -508,7 +536,7 @@ class RedditIO(threading.Thread, LogicMixin):
 		# A list of Comment reply Things from the database that have had text generated,
 		# but not a reddit post attempt
 		return list(db_Thing.select(db_Thing).
-					where(db_Thing.source_name != 't3_new_submission').
+					where(db_Thing.source_name != 't7_new_submission').
 					where(db_Thing.bot_username == self._bot_username).
 					where(db_Thing.status == 7))
 
@@ -517,7 +545,7 @@ class RedditIO(threading.Thread, LogicMixin):
 		# but not a reddit post attempt
 
 		return list(db_Thing.select(db_Thing).
-					where(db_Thing.source_name == 't3_new_submission').
+					where(db_Thing.source_name == 't7_new_submission').
 					where(db_Thing.bot_username == self._bot_username).
 					where(db_Thing.status == 7))
 
@@ -529,22 +557,22 @@ class RedditIO(threading.Thread, LogicMixin):
 
 		submission = None
 
-		if isinstance(praw_thing, praw_Message):
+		if isinstance(praw_thing, pbfaw_Message):
 			# A message that has been deleted can't be retrieved due to bug in praw
 			return False
 
-		elif isinstance(praw_thing, praw_Comment):
+		elif isinstance(praw_thing, pbfaw_Comment):
 			submission = praw_thing.submission
 
 			if praw_thing.body in ['[removed]', '[deleted]']:
 				logging.error(f'Comment {praw_thing} has been deleted.')
 				return True
 
-		elif isinstance(praw_thing, praw_Submission):
+		elif isinstance(praw_thing, pbfaw_Submission):
 			submission = praw_thing
 
 		if submission:
-			if submission.author is None or submission.removed_by_category is not None:
+			if submission.author is None or submission.removal_reason is not None:
 				logging.error(f'Submission {submission} has been removed or deleted.')
 				return True
 
@@ -564,16 +592,16 @@ class RedditIO(threading.Thread, LogicMixin):
 		break_after_compare = False
 
 		while loop_thing and counter < to_level:
-			if isinstance(loop_thing, praw_Submission):
+			if isinstance(loop_thing, pbfaw_Submission):
 				# On a submission we'll only check the title
 				text_to_compare = loop_thing.title
 				break_after_compare = True
 
-			elif isinstance(loop_thing, praw_Comment):
+			elif isinstance(loop_thing, pbfaw_Comment):
 				text_to_compare = loop_thing.body
 				loop_thing = loop_thing.parent()
 
-			elif isinstance(loop_thing, praw_Message):
+			elif isinstance(loop_thing, pbfaw_Message):
 				text_to_compare = loop_thing.body
 
 				if loop_thing.parent_id:
@@ -612,7 +640,7 @@ class RedditIO(threading.Thread, LogicMixin):
 			if refresh_counter % 9 == 0:
 				try:
 					ancestor.refresh()
-				except praw.exceptions.ClientException:
+				except pbfaw.exceptions.ClientException:
 					# An error can occur if a message is missing for some reason.
 					# To keep the bot alive, return early.
 					logging.exception("Exception when counting the comment depth. returning early.")

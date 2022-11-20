@@ -13,6 +13,8 @@ import torch
 
 from configparser import ConfigParser
 from pathlib import Path
+from diffusers import StableDiffusionPipeline
+from torch import autocast
 
 from reddit_io.tagging_mixin import TaggingMixin
 
@@ -27,8 +29,8 @@ class Text2Image(threading.Thread, TaggingMixin):
 	name = "Text2Image"
 
 	# The amount of RAM required to start, in KB
-	# The default value here is sufficient for a 380x380 image 
-	_memory_required = 8000000
+	# The default value here is sufficient for a 380x380 image
+	_memory_required = 8000
 
 	def __init__(self):
 		threading.Thread.__init__(self)
@@ -81,8 +83,8 @@ class Text2Image(threading.Thread, TaggingMixin):
 
 	def generate_image(self, bot_username, image_generation_parameters):
 
-		vqgan_path = ROOT_DIR / self._config[bot_username]['vqgan-clip_path']
-		filename = f"{bot_username}_vqgan_output_{int(time.time())}.png"
+		sd_path = ROOT_DIR / self._config[bot_username]['sd_path']
+		filename = f"{bot_username}_sd_output_{int(time.time())}.png"
 		filepath = ROOT_DIR / "generated_images" / filename
 
 		start_time = time.time()
@@ -92,23 +94,28 @@ class Text2Image(threading.Thread, TaggingMixin):
 
 		# pop the prompt out from the args
 		prompt = image_generation_parameters.pop('prompt', '').replace('\'', '').replace("\"", "")
-		x = image_generation_parameters.pop('x_size', 256)
-		y = image_generation_parameters.pop('y_size', 256)
-		iterations = image_generation_parameters.pop('iterations', 500)
+		print(prompt)
+		x = image_generation_parameters.pop('x_size', 512)
+		y = image_generation_parameters.pop('y_size', 512)
+		iterations = 35
 
-		if search_prefix:
-			prompt = f"{prompt} | {search_prefix}"
+		#if search_prefix:
+		#	prompt = f"{prompt} | {search_prefix}"
 
-		cmd_change_directory = f"cd {vqgan_path}"
-		cmd_generate = f"python {vqgan_path}/generate.py -p '{prompt}' -s {x} {y} -o {filepath} -i {iterations}"
+		cmd_change_directory = f"cd {sd_path}"
+		cmd_generate = f"python {sd_path}/generate.py --prompt \"{prompt}\" --W {x} --H {y} -o {filepath} --n_iter {iterations}"
+		print(cmd_generate)
+		prompt = prompt + ",photorealistic,masterpiece,high quality,realism, intricate"
+		print(prompt)
+		pipe = StableDiffusionPipeline.from_pretrained(
+			"models/stable-diffusion-v1-4",
+			use_auth_token=True
+		).to("cuda")
+		with autocast("cuda"):
+			image = pipe(prompt).images[0]
 
-		p = subprocess.Popen(f"{cmd_change_directory} ; {cmd_generate}", shell=True, text=True,
-			stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-		for line in p.stdout:
-			# Stream the output from the subprocess into the logging
-			# Convert bytes to a string
-			logging.info(ftfy.fix_text(line.replace('\n', '')))
-		p.wait()
+		image.save(filepath)
+		torch.cuda.empty_cache()
 
 		end_time = time.time()
 		duration = round(end_time - start_time, 1)

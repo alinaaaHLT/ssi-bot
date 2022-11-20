@@ -1,5 +1,5 @@
 ssi-bot.ini
-praw.ini
+/praw.ini
 bot-db.sqlite3*
 pushshift.sqlite3*
 models/*

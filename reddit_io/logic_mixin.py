@@ -5,6 +5,7 @@ import re
 
 from datetime import datetime
 
+from pbfaw.models import (Submission as pbfaw_Submission, Comment as pbfaw_Comment, Message as pbfaw_Message)
 from praw.models import (Submission as praw_Submission, Comment as praw_Comment, Message as praw_Message)
 
 from .tagging_mixin import TaggingMixin
@@ -37,7 +38,7 @@ class LogicMixin(TaggingMixin):
 
 		while loop_thing and counter < to_level:
 
-			if isinstance(loop_thing, praw_Submission):
+			if isinstance(loop_thing, pbfaw_Message):
 
 				tagged_text = self.tag_submission(loop_thing, use_reply_sense)
 				prefix = tagged_text + prefix
@@ -45,14 +46,14 @@ class LogicMixin(TaggingMixin):
 				# can't go any higher than a submission, so break the loop
 				break
 
-			elif isinstance(loop_thing, praw_Comment):
+			elif isinstance(loop_thing, pbfaw_Comment):
 				# It's a comment
 				tagged_text = self.tag_comment(loop_thing, use_reply_sense)
 				prefix = tagged_text + prefix
 
 				loop_thing = loop_thing.parent()
 
-			elif isinstance(loop_thing, praw_Message):
+			elif isinstance(loop_thing, pbfaw_Message):
 
 				tagged_text = self.tag_message(loop_thing, use_reply_sense)
 				prefix = tagged_text + prefix
@@ -83,6 +84,7 @@ class LogicMixin(TaggingMixin):
 	def calculate_reply_probability(self, praw_thing):
 		# Ths function contains all of the logic used for deciding whether to reply
 
+
 		if not praw_thing.author:
 			# If the praw_thing has been deleted the author will be None,
 			# don't proceed to attempt a reply. Usually we will have downloaded
@@ -101,13 +103,13 @@ class LogicMixin(TaggingMixin):
 		submission_created_utc = None
 		is_own_comment_reply = False
 
-		if isinstance(praw_thing, praw_Submission):
+		if isinstance(praw_thing, pbfaw_Submission) or isinstance(praw_thing, praw_Submission):
 			# object is a submission that has title and selftext
 			thing_text_content = f'{praw_thing.title} {praw_thing.selftext}'
 			submission_link_flair_text = praw_thing.link_flair_text or ''
 			submission_created_utc = datetime.utcfromtimestamp(praw_thing.created_utc)
 
-		elif isinstance(praw_thing, praw_Comment):
+		elif isinstance(praw_thing, pbfaw_Comment) or isinstance(praw_thing, praw_Comment):
 			# otherwise it's a comment
 			thing_text_content = praw_thing.body
 			# navigate to the parent submission to get the link_flair_text
@@ -115,7 +117,7 @@ class LogicMixin(TaggingMixin):
 			submission_created_utc = datetime.utcfromtimestamp(praw_thing.submission.created_utc)
 			is_own_comment_reply = praw_thing.parent().author == self._praw.user.me().name
 
-		elif isinstance(praw_thing, praw_Message):
+		elif isinstance(praw_thing, pbfaw_Message) or isinstance(praw_thing, praw_Message):
 			thing_text_content = praw_thing.body
 			submission_created_utc = datetime.utcfromtimestamp(praw_thing.created_utc)
 
@@ -127,7 +129,7 @@ class LogicMixin(TaggingMixin):
 			return 0
 
 		# if the submission is flaired as a subreddit announcement,
-		# do not reply so as to not spam the sub
+		# do not reply to not spam the sub
 		if submission_link_flair_text.lower() in ['announcement']:
 			return 0
 
@@ -139,7 +141,7 @@ class LogicMixin(TaggingMixin):
 		# if the bot is mentioned, or its username is in the thing_text_content, reply 100%
 		if getattr(praw_thing, 'type', '') == 'username_mention' or\
 			self._praw.user.me().name.lower() in thing_text_content.lower() or\
-			isinstance(praw_thing, praw_Message):
+			isinstance(praw_thing, pbfaw_Message):
 			return self._message_mention_reply_probability
 
 		# From here we will start to calculate the probability cumulatively
@@ -147,7 +149,7 @@ class LogicMixin(TaggingMixin):
 		# Try not to spam the sub too much and let other bots and humans have space to post
 		base_probability = self._base_reply_probability
 
-		if isinstance(praw_thing, praw_Comment):
+		if isinstance(praw_thing, pbfaw_Comment):
 			# Find the depth of the comment
 			comment_depth = self._find_depth_of_comment(praw_thing)
 			if comment_depth > 12:
@@ -161,8 +163,8 @@ class LogicMixin(TaggingMixin):
 		# Check the flair and username to see if the author might be a bot
 		# 'Verified GPT-2 Bot' is only valid on r/subsimgpt2interactive
 		# Sometimes author_flair_text will be present but None
-		if 'verified gpt-2' in (getattr(praw_thing, 'author_flair_text', '') or '').lower()\
-			or any(praw_thing.author.name.lower().endswith(i) for i in ['ssi', 'bot', 'gpt2']):
+		if 'verified gpt' in (getattr(praw_thing, 'author_flair_text', '') or '').lower()\
+			or any(praw_thing.author.name.lower().endswith(i) for i in ['ssi', 'bot', 'gpt2', 'gpt3']):
 			# Adjust for when the author is a bot
 			base_probability += self._bot_author_reply_boost
 		else:
@@ -173,18 +175,18 @@ class LogicMixin(TaggingMixin):
 			# A positive keyword was found, increase probability of replying
 			base_probability += self._positive_keyword_reply_boost
 
-		if isinstance(praw_thing, praw_Submission):
+		if isinstance(praw_thing, pbfaw_Submission):
 			# it's a brand new submission.
 			# This is mostly obsoleted by the depth penalty
 			base_probability += self._new_submission_reply_boost
 
-		if isinstance(praw_thing, praw_Submission) or is_own_comment_reply:
+		if isinstance(praw_thing, pbfaw_Submission) or is_own_comment_reply:
 			if any(kw.lower() in thing_text_content.lower() for kw in ['?', ' you', 'what', 'how', 'when', 'why']):
 				# any interrogative terms in the submission or comment text;
 				# results in an increased reply probability
 				base_probability += self._interrogative_reply_boost
 
-		if isinstance(praw_thing, praw_Comment):
+		if isinstance(praw_thing, pbfaw_Comment):
 			if praw_thing.parent().author == self._praw.user.me().name:
 				# the post prior to this is by the bot
 				base_probability += self._own_comment_reply_boost
