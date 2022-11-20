@@ -97,7 +97,7 @@ class LogicMixin(TaggingMixin):
 			# Ignore comments/messages from Admins
 			return 0
 
-		# merge the text content into a single variable so it's easier to work with
+		# merge the text content into a single variable, so it's easier to work with
 		thing_text_content = ''
 		submission_link_flair_text = ''
 		submission_created_utc = None

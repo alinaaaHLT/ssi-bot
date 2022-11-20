@@ -233,7 +233,7 @@ class RedditIO(threading.Thread, LogicMixin):
 
 			# If the thing is already in the database then we've already calculated a reply for it.
 			if not record:
-				thing_label = 'comment' if isinstance(praw_thing, pbfaw_Comment) else 'submission'
+				thing_label = 'comment' if isinstance(praw_thing, pbfaw_Comment) or isinstance(praw_thing, praw_Comment) else 'submission'
 				logging.info(f"New {thing_label} thing received {praw_thing.name} from {praw_thing.subreddit}")
 
 				if self._is_praw_thing_removed_or_deleted(praw_thing):
@@ -454,14 +454,14 @@ class RedditIO(threading.Thread, LogicMixin):
 	def _get_name_for_thing(self, praw_thing):
 		# Infer the name for the thing without doing a network request
 		val = "BotForum"
-		if val == "BotForum":
+		if self._platform == "BotForum":
 			if isinstance(praw_thing, pbfaw_Comment):
 				return f"t1_{praw_thing.id}"
 			if isinstance(praw_thing, pbfaw_Submission):
 				return f"t7_{praw_thing.id}"
 			if isinstance(praw_thing, pbfaw_Message):
 				return f"t8_{praw_thing.id}"
-		if val == "Reddit":
+		if self._platform  == "Reddit":
 			if isinstance(praw_thing, praw_Comment):
 				return f"t1_{praw_thing.id}"
 			if isinstance(praw_thing, praw_Submission):
