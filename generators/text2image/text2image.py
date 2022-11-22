@@ -54,7 +54,7 @@ class Text2Image(threading.Thread, TaggingMixin):
 				continue
 
 			if get_available_memory(self._use_gpu) < self._memory_required:
-				# Not enough memory.. Sleep and start again
+				# Not enough memory… Sleep and start again
 				time.sleep(30)
 				continue
 
@@ -83,7 +83,7 @@ class Text2Image(threading.Thread, TaggingMixin):
 
 	def generate_image(self, bot_username, image_generation_parameters):
 
-		sd_path = ROOT_DIR / self._config[bot_username]['sd_path']
+		sdmodelpath = ROOT_DIR / self._config[bot_username]['sd_model_path']
 		filename = f"{bot_username}_sd_output_{int(time.time())}.png"
 		filepath = ROOT_DIR / "generated_images" / filename
 
@@ -98,18 +98,15 @@ class Text2Image(threading.Thread, TaggingMixin):
 		x = image_generation_parameters.pop('x_size', 512)
 		y = image_generation_parameters.pop('y_size', 512)
 		iterations = 35
+		search_prefix =	search_prefix.replace('\'', '').replace("\"", "")
+		if search_prefix != "":
+			prompt = f"{prompt} , {search_prefix}"
+		prompt = "photo of" + prompt + ",photorealistic,masterpiece,high quality,realism, intricate"
 
-		#if search_prefix:
-		#	prompt = f"{prompt} | {search_prefix}"
-
-		cmd_change_directory = f"cd {sd_path}"
-		cmd_generate = f"python {sd_path}/generate.py --prompt \"{prompt}\" --W {x} --H {y} -o {filepath} --n_iter {iterations}"
-		print(cmd_generate)
-		prompt = prompt + ",photorealistic,masterpiece,high quality,realism, intricate"
-		print(prompt)
 		pipe = StableDiffusionPipeline.from_pretrained(
-			"models/stable-diffusion-v1-4",
-			use_auth_token=True
+			sdmodelpath,
+			torch_dtype=torch.float16,
+			revision="fp16"
 		).to("cuda")
 		with autocast("cuda"):
 			image = pipe(prompt).images[0]
