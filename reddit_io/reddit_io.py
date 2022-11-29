@@ -400,8 +400,11 @@ class RedditIO(threading.Thread, LogicMixin):
 
 			# Put the praw thing into the database so it's registered as a submitted job
 			self.insert_praw_thing_into_database(submission_praw_thing)
-
-			logging.info(f"Job {post_job.id} submission submitted successfully: https://botforum.net{submission_praw_thing.permalink}")
+			if self._platform =="BotForum":
+				platform_url = "https://botforum.net"
+			else:
+				platform_url = "https://reddit.com"
+			logging.info(f"Job {post_job.id} submission submitted successfully: {platform_url}{submission_praw_thing.permalink}")
 
 		except pbfaw.exceptions.RedditAPIException as e:
 			if 'DOMAIN_BANNED' in str(e):
@@ -499,7 +502,7 @@ class RedditIO(threading.Thread, LogicMixin):
 					where(db_Thing.source_name.startswith(self.submission_kind)).
 					where(db_Thing.author == self._bot_username).
 					where(db_Thing.status == 8).
-					where(db_Thing.created_utc > (datetime.utcnow() - timedelta(minutes=hourly_frequency))))
+					where(db_Thing.created_utc > (datetime.utcnow() - timedelta(hours=hourly_frequency))))
 
 		if recent_submissions:
 			# If there was any submission that is either pending or submitted in the timeframe

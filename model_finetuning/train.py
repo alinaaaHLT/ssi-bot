@@ -1,5 +1,6 @@
 from simpletransformers.language_modeling import LanguageModelingModel
 from datetime import datetime
+import os
 
 # edit these to include the names of the training and eval .txt files created by output_finetuning_data.py
 training_file = "bot_train.txt"
@@ -15,13 +16,13 @@ model_name = "gpt2"
 use_gpu = False
 
 current_date_time = datetime.now()
-bot_label = "bot_" + current_date_time.strftime("%d%m%Y_%H%M")
+bot_label = "bot_20221126"
 
 args = {
     "overwrite_output_dir": True,
     "learning_rate": 1e-4,
     # larger batch sizes will use more training data but consume more ram
-    "train_batch_size": 4,
+    "train_batch_size": 2,
     # accumulation steps
     "gradient_accumulation_steps": 1,
     "max_steps": 12000,
@@ -53,6 +54,18 @@ args = {
     "output_dir": f"{bot_label}/",
     "best_model_dir": f"{bot_label}/best_model",
 }
+# Check to see if a model already exists for this bot_label
+resume_training_path = f"{bot_label}/best_model/"
+
+if os.path.exists(resume_training_path):
+    # A model path already exists. So we'll attempt to resume training starting fom the previous best_model.
+    args['output_dir'] = resume_training_path
+    args['best_model_dir'] = f"{resume_training_path}/resume_best_model/"
+    model = LanguageModelingModel("gpt2", resume_training_path, args=args)
+    print("resuming")
+else:
+  # Create a new model
+  model = LanguageModelingModel("gpt2", "gpt2-medium")
 
 model = LanguageModelingModel(model_type, model_name, use_cuda=use_gpu)
 

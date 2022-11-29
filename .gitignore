@@ -13,3 +13,4 @@ cache_dir/*
 __pycache__/
 *.py[cod]
 .vscode/launch.json
+.idea/
