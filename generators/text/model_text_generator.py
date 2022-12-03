@@ -4,6 +4,8 @@ import logging
 import threading
 import time
 
+import torch
+
 from pathlib import Path
 from configparser import ConfigParser
 
@@ -26,14 +28,14 @@ class ModelTextGenerator(threading.Thread, TaggingMixin):
 
 	# GPU is not really required for text generation
 	# So the default is False
-	_use_gpu = False
+	_use_gpu = False#torch.cuda.is_available()
 
 	_config = None
 
 	# The amount of memory required to start generation, in KB
 	# This is the default for GPT-2 Small (117M parameters)
 	# This will need to be increased for larger GPT-2 models
-	_memory_required = 1400000
+	_memory_required = 14000
 
 	def __init__(self):
 		threading.Thread.__init__(self)
@@ -74,7 +76,6 @@ class ModelTextGenerator(threading.Thread, TaggingMixin):
 					generated_text = self.generate_text(job.bot_username, job.text_generation_parameters.copy())
 
 					if generated_text:
-
 						# Check for any negative keywords in the generated text and if so, return nothing
 						negative_keyword_matches = self.test_text_against_keywords(job.bot_username, generated_text)
 						if negative_keyword_matches:
@@ -121,14 +122,18 @@ class ModelTextGenerator(threading.Thread, TaggingMixin):
 		prompt = text_generation_parameters.pop('prompt', '')
 
 		output_list = model.generate(prompt=prompt, args=text_generation_parameters)
-
+		#output_list = output_list_tmp[0].replace('r/', 's/')
 		end_time = time.time()
 		duration = round(end_time - start_time, 1)
 
 		logging.info(f'{len(output_list)} sample(s) of text generated in {duration} seconds.')
 
 		if output_list:
-			return output_list[0]
+			output = output_list[0]
+			output_replaced = output.replace('r/', 's/')
+			print('TESSSSSSST: '+ output_replaced)
+			#return output_list[0]
+			return output_replaced
 
 	def top_pending_jobs(self):
 		"""
@@ -153,14 +158,13 @@ class ModelTextGenerator(threading.Thread, TaggingMixin):
 		# Remove tags from the
 		new_text = generated_text[len(prompt):]
 		tagless_new_text = self.remove_tags_from_string(new_text)
-
 		# Reconfigure the toxicity helper to use the bot's config
 		self._toxicity_helper.load_config_section(bot_username)
 		return self._toxicity_helper.text_above_toxicity_threshold(tagless_new_text)
 
 	def validate_generated_text(self, source_name, prompt, generated_text):
 
-		if source_name == 't3_new_submission':
+		if source_name == 't7_new_submission':
 			# The job is to create a new submission so
 			# Check it has a title
 			title = self.extract_title_from_generated_text(generated_text)
@@ -172,6 +176,7 @@ class ModelTextGenerator(threading.Thread, TaggingMixin):
 			# The job is to create a reply
 			# Check that is has a closing tag
 			new_text = generated_text[len(prompt):]
+			print("TEST" + new_text)
 			if not self._end_tag in new_text:
 				logging.info("Validation failed, no end tag")
 			return self._end_tag in new_text

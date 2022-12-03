@@ -1,5 +1,5 @@
 ssi-bot.ini
-praw.ini
+/praw.ini
 bot-db.sqlite3*
 pushshift.sqlite3*
 models/*
@@ -13,3 +13,4 @@ cache_dir/*
 __pycache__/
 *.py[cod]
 .vscode/launch.json
+.idea/
