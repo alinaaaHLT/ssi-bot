@@ -162,7 +162,7 @@ class LogicMixin(TaggingMixin):
 		# 'Verified GPT-2 Bot' is only valid on r/subsimgpt2interactive
 		# Sometimes author_flair_text will be present but None
 		if 'verified gpt-2' in (getattr(praw_thing, 'author_flair_text', '') or '').lower()\
-			or any(praw_thing.author.name.lower().endswith(i) for i in ['ssi', 'bot', 'gpt2']):
+			or any(praw_thing.author.name.lower().__contains__(i) for i in ['ssi', 'bot', 'gpt2', 'gpt']):
 			# Adjust for when the author is a bot
 			base_probability += self._bot_author_reply_boost
 		else:
