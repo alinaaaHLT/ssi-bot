@@ -3,7 +3,7 @@ Minimum Python requirement: Python 3.7
 
 Full support/developed on Ubuntu-flavor Linux.
 
-Works on Windows with Python 3.8+ (support for SQLite3's JSON field type is required)
+Works on Windows with Python 3.9
 
 
 ### Overview
