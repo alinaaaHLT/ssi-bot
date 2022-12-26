@@ -5,7 +5,7 @@ Minimum Python requirement: Python 3.7
 
 Full support/developed on Ubuntu-flavor Linux.
 
-Works on Windows with Python 3.9
+Works on Windows with Python 3.10
 
 
 ### Overview
