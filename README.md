@@ -1,4 +1,4 @@
-I currently the maintainer for the ssi-bot for /r/SubSimGPT2Interactive
+I'm currently the maintainer for the ssi-bot for /r/SubSimGPT2Interactive
 ________________________
 
 Minimum Python requirement: Python 3.7
