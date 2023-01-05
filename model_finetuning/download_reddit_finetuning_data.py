@@ -140,13 +140,11 @@ def main():
 		push_to_DB = config['DEFAULT'].getboolean('push_to_DB')
 	if config['DEFAULT']['push_existing_JSON_to_DB']:
 		push_existing_JSON_to_DB = config['DEFAULT'].getboolean('push_existing_JSON_to_DB')
-
 	# Queue for the write to db thread to receive from
 	q = Queue()
-	# The worker thread will run in the background copying files into the database	
-
 	if push_to_DB:
 
+		# The worker thread will run in the background copying files into the database
 		# even while we're still downloading new ones (saves time)
 
 		#Allows to disable writing to DB, useful for remote download
@@ -187,7 +185,7 @@ def main():
 
 				# Get the top (x) number of submissions for that period.
 				submission_search_link = ('https://api.pushshift.io/reddit/submission/search/'
-							'?subreddit={}&after={}&before={}&stickied=0&sort_type=score&order=desc&limit={}&mod_removed=0')
+							'?subreddit={}&after={}&before={}&stickied=0&sort_type=score&sort=desc&limit={}&mod_removed=0')
 				submission_search_link = submission_search_link.format(subreddit, int(start.timestamp()), int(end.timestamp()), submission_limit)
 
 				while submission_attempt < max_attempts and not submission_success:
@@ -260,7 +258,7 @@ def main():
 						print(f"{comment_output_path} does not exist on the disk, downloading...")
 					# print(submission_json_item)
 					comment_search_link = ('https://api.pushshift.io/reddit/comment/search/'
-								'?subreddit={}&link_id={}&sort=created_utc&order=asc')
+								'?subreddit={}&link_id={}&sort_type=created_utc&sort=asc')
 					comment_search_link = comment_search_link.format(subreddit, submission_json_item['id'])
 
 					while comment_attempt < max_attempts and not comment_success:
@@ -284,8 +282,7 @@ def main():
 
 						# Have to sleep a bit here or else pushshift will start to block our requests
 						time.sleep(0.05)
-				else:
-					print(f"Comment Output Path {comment_output_path}")
+
 				# Put it into the queue to write into the database
 				q.put(comment_output_path)
 
