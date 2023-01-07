@@ -204,5 +204,4 @@ class LogicMixin(TaggingMixin):
 		# calculate rate of decay over x hours
 		rate_of_decay = max(0, 1 - (age_of_submission / 24))
 		# multiply the rate of decay by the reply probability
-		return 1
-		#return round(reply_probability * rate_of_decay, 2)
+		return round(reply_probability * rate_of_decay, 2)
