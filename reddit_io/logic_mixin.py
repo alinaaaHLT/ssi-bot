@@ -38,7 +38,7 @@ class LogicMixin(TaggingMixin):
 
 		while loop_thing and counter < to_level:
 
-			if isinstance(loop_thing, pbfaw_Message):
+			if isinstance(loop_thing, pbfaw_Submission) or isinstance(loop_thing, praw_Submission):
 
 				tagged_text = self.tag_submission(loop_thing, use_reply_sense)
 				prefix = tagged_text + prefix
@@ -46,14 +46,14 @@ class LogicMixin(TaggingMixin):
 				# can't go any higher than a submission, so break the loop
 				break
 
-			elif isinstance(loop_thing, pbfaw_Comment):
+			elif isinstance(loop_thing, pbfaw_Comment) or isinstance(loop_thing, praw_Comment):
 				# It's a comment
 				tagged_text = self.tag_comment(loop_thing, use_reply_sense)
 				prefix = tagged_text + prefix
 
 				loop_thing = loop_thing.parent()
 
-			elif isinstance(loop_thing, pbfaw_Message):
+			elif isinstance(loop_thing, pbfaw_Message) or isinstance(loop_thing, praw_Message):
 
 				tagged_text = self.tag_message(loop_thing, use_reply_sense)
 				prefix = tagged_text + prefix
@@ -204,4 +204,5 @@ class LogicMixin(TaggingMixin):
 		# calculate rate of decay over x hours
 		rate_of_decay = max(0, 1 - (age_of_submission / 24))
 		# multiply the rate of decay by the reply probability
-		return round(reply_probability * rate_of_decay, 2)
+		return 1
+		#return round(reply_probability * rate_of_decay, 2)
