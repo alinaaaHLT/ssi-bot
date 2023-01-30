@@ -66,7 +66,7 @@ def write_to_database(q):
 
 		try:
 			#Fixes a bug that stops the code when there is an empty/invalid JSON leftover
-			with open(json_filepath, 'r') as f:
+			with open(json_filepath, 'r', encoding="utf8") as f:
 				data = json.load(f)
 
 			for json_item in data['data']:
@@ -84,7 +84,8 @@ def write_to_database(q):
 						json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(')'))\
 								or ('http' in json_item['body'].lower() and ' ' not in json_item['body'])
 
-
+						if not json_item['parent_id']:
+							continue
 						db_record = db_Comment.create(**json_item)
 						if verbose:
 							print(f"comment {json_item['id']} written to database")
@@ -260,7 +261,7 @@ def main():
 					# print(submission_json_item)
 					comment_search_link = ('https://api.pushshift.io/reddit/comment/search/'
 								'?subreddit={}&link_id={}&sort=created_utc&order=asc')
-					comment_search_link = comment_search_link.format(subreddit, submission_json_item['id'])
+					comment_search_link = comment_search_link.format(subreddit, int(submission_json_item['id'], 36))
 
 					while comment_attempt < max_attempts and not comment_success:
 
@@ -278,7 +279,7 @@ def main():
 						else:
 							comment_success = True
 
-						with open(comment_output_path, "w") as f:
+						with open(comment_output_path, "w", encoding="utf8") as f:
 							f.write(comment_response.text)
 
 						# Have to sleep a bit here or else pushshift will start to block our requests
