@@ -7,7 +7,11 @@ model_finetuning/json_data/*
 model_finetuning/*.sqlite3
 model_finetuning/dataset.ini
 model_finetuning/training_output*
+model_finetuning/dump/
 cache_dir/*
+py-venv
+*.sqlite3*
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

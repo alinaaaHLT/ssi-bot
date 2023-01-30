@@ -185,7 +185,7 @@ def main():
 
 				# Get the top (x) number of submissions for that period.
 				submission_search_link = ('https://api.pushshift.io/reddit/submission/search/'
-							'?subreddit={}&after={}&before={}&stickied=0&sort_type=score&sort=desc&limit={}&mod_removed=0')
+							'?subreddit={}&after={}&before={}&stickied=0&sort=score&order=desc&limit={}&mod_removed=0')
 				submission_search_link = submission_search_link.format(subreddit, int(start.timestamp()), int(end.timestamp()), submission_limit)
 
 				while submission_attempt < max_attempts and not submission_success:
@@ -204,7 +204,8 @@ def main():
 					else:
 						submission_success = True
 
-					with open(submission_output_path, "w") as f:
+					with open(submission_output_path, "w", encoding="utf8") as f:
+						test = submission_response.text
 						f.write(submission_response.text)
 
 					time.sleep(0.1)
@@ -258,7 +259,7 @@ def main():
 						print(f"{comment_output_path} does not exist on the disk, downloading...")
 					# print(submission_json_item)
 					comment_search_link = ('https://api.pushshift.io/reddit/comment/search/'
-								'?subreddit={}&link_id={}&sort_type=created_utc&sort=asc')
+								'?subreddit={}&link_id={}&sort=created_utc&order=asc')
 					comment_search_link = comment_search_link.format(subreddit, submission_json_item['id'])
 
 					while comment_attempt < max_attempts and not comment_success:
