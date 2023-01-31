@@ -175,7 +175,7 @@ def main():
 			os.makedirs(output_dir)
 		data_dict = {}
 		data = []
-		if 1==1:
+		if 1==0:
 			with open(input_file, encoding='utf8') as f:
 				iterator = 0
 				file_stamp = 0
@@ -184,7 +184,7 @@ def main():
 					submissionDict = json.loads(line)
 					data.append(submissionDict)
 					iterator = iterator + 1
-					if iterator >= 100:
+					if iterator >= 10:
 						file_stamp = file_stamp + iterator
 						test = os.path.isfile(submission_output_path)
 						if not os.path.isfile(submission_output_path):
@@ -203,7 +203,7 @@ def main():
 						# we'll try and pick up the comments for each submission id
 						submission_json = None
 
-		if 1==0:
+		if 1==1:
 			for file in os.listdir(output_dir):
 				if "submission" in file:
 					file = output_dir+"/"+file
