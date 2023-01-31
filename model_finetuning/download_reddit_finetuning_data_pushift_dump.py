@@ -239,7 +239,8 @@ def main():
 							# print(submission_json_item)
 							comment_search_link = ('https://api.pushshift.io/reddit/comment/search/'
 												   '?subreddit={}&link_id={}&sort=created_utc&order=asc')
-							comment_search_link = comment_search_link.format(subreddit, submission_json_item['id'])
+
+							comment_search_link = comment_search_link.format(subreddit, int(submission_json_item['id'], 36))
 
 							while comment_attempt < max_attempts and not comment_success:
 
