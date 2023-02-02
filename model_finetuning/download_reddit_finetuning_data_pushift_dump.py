@@ -175,7 +175,7 @@ def main():
 			os.makedirs(output_dir)
 		data_dict = {}
 		data = []
-		if 1==0:
+		if 1==1:
 			with open(input_file, encoding='utf8') as f:
 				iterator = 0
 				file_stamp = 0
@@ -188,7 +188,7 @@ def main():
 						file_stamp = file_stamp + iterator
 						test = os.path.isfile(submission_output_path)
 						if not os.path.isfile(submission_output_path):
-							with open(submission_output_path, "w") as f:
+							with open(submission_output_path, "w", encoding='utf8') as f:
 								data_dict["data"] = data
 								f.write(json.dumps(data_dict))
 								data = []
@@ -233,42 +233,45 @@ def main():
 
 						comment_output_path = f"json_data/{subreddit}/{subreddit}_{submission_json_item['id']}_comment.json"
 
-						if not os.path.isfile(comment_output_path):
-							if verbose:
-								print(f"{comment_output_path} does not exist on the disk, downloading...")
-							# print(submission_json_item)
-							comment_search_link = ('https://api.pushshift.io/reddit/comment/search/'
-												   '?subreddit={}&link_id={}&sort=created_utc&order=asc')
+						try:
+							if not os.path.isfile(comment_output_path):
+								if verbose:
+									print(f"{comment_output_path} does not exist on the disk, downloading...")
+								# print(submission_json_item)
+								comment_search_link = ('https://api.pushshift.io/reddit/comment/search/'
+													   '?subreddit={}&link_id={}&sort=created_utc&order=asc')
 
-							comment_search_link = comment_search_link.format(subreddit, int(submission_json_item['id'], 36))
+								comment_search_link = comment_search_link.format(subreddit, int(submission_json_item['id'], 36))
 
-							while comment_attempt < max_attempts and not comment_success:
+								while comment_attempt < max_attempts and not comment_success:
 
-								comment_attempt += 1
+									comment_attempt += 1
 
-								comment_response = requests.get(comment_search_link)
+									comment_response = requests.get(comment_search_link)
 
-								if comment_response.status_code != 200:
-									if comment_attempt >= max_attempts:
-										print(
-											f"Request error! Could not download comment data, status code {comment_response.status_code}")
-									elif verbose:
-										print(
-											f"Request error! Status code {comment_response.status_code}, retrying (attempt {comment_attempt} of {max_attempts})")
-									time.sleep(0.1)
-									continue
-								else:
-									comment_success = True
+									if comment_response.status_code != 200:
+										if comment_attempt >= max_attempts:
+											print(
+												f"Request error! Could not download comment data, status code {comment_response.status_code}")
+										elif verbose:
+											print(
+												f"Request error! Status code {comment_response.status_code}, retrying (attempt {comment_attempt} of {max_attempts})")
+										time.sleep(0.4)
+										continue
+									else:
+										comment_success = True
 
-								with open(comment_output_path, "w") as f:
-									f.write(comment_response.text)
+									with open(comment_output_path, "w",encoding='utf8') as f:
+										f.write(comment_response.text)
 
-								# Have to sleep a bit here or else pushshift will start to block our requests
-								time.sleep(0.05)
+									# Have to sleep a bit here or else pushshift will start to block our requests
+									time.sleep(0.05)
 
-						# Put it into the queue to write into the database
-						q.put(comment_output_path)
-
+							# Put it into the queue to write into the database
+							q.put(comment_output_path)
+						except requests.exceptions.ConnectionError:
+							time.sleep(2)
+							continue
 	q.join()
 	print("finished!")
 
