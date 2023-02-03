@@ -66,7 +66,7 @@ def write_to_database(q):
 
 		try:
 			#Fixes a bug that stops the code when there is an empty/invalid JSON leftover
-			with open(json_filepath, 'r') as f:
+			with open(json_filepath, 'r', encoding="utf8") as f:
 				data = json.load(f)
 
 			for json_item in data['data']:
@@ -84,7 +84,8 @@ def write_to_database(q):
 						json_item['is_url_only'] = (json_item['body'].startswith('[') and json_item['body'].endswith(')'))\
 								or ('http' in json_item['body'].lower() and ' ' not in json_item['body'])
 
-
+						if not json_item['parent_id']:
+							continue
 						db_record = db_Comment.create(**json_item)
 						if verbose:
 							print(f"comment {json_item['id']} written to database")
@@ -140,13 +141,11 @@ def main():
 		push_to_DB = config['DEFAULT'].getboolean('push_to_DB')
 	if config['DEFAULT']['push_existing_JSON_to_DB']:
 		push_existing_JSON_to_DB = config['DEFAULT'].getboolean('push_existing_JSON_to_DB')
-
 	# Queue for the write to db thread to receive from
 	q = Queue()
-	# The worker thread will run in the background copying files into the database	
-
 	if push_to_DB:
 
+		# The worker thread will run in the background copying files into the database
 		# even while we're still downloading new ones (saves time)
 
 		#Allows to disable writing to DB, useful for remote download
@@ -187,7 +186,7 @@ def main():
 
 				# Get the top (x) number of submissions for that period.
 				submission_search_link = ('https://api.pushshift.io/reddit/submission/search/'
-							'?subreddit={}&after={}&before={}&stickied=0&sort_type=score&sort=desc&limit={}&mod_removed=0')
+							'?subreddit={}&after={}&before={}&stickied=0&sort=score&order=desc&limit={}&mod_removed=0')
 				submission_search_link = submission_search_link.format(subreddit, int(start.timestamp()), int(end.timestamp()), submission_limit)
 
 				while submission_attempt < max_attempts and not submission_success:
@@ -206,7 +205,8 @@ def main():
 					else:
 						submission_success = True
 
-					with open(submission_output_path, "w") as f:
+					with open(submission_output_path, "w", encoding="utf8") as f:
+						test = submission_response.text
 						f.write(submission_response.text)
 
 					time.sleep(0.1)
@@ -260,8 +260,8 @@ def main():
 						print(f"{comment_output_path} does not exist on the disk, downloading...")
 					# print(submission_json_item)
 					comment_search_link = ('https://api.pushshift.io/reddit/comment/search/'
-								'?subreddit={}&link_id={}&sort_type=created_utc&sort=asc')
-					comment_search_link = comment_search_link.format(subreddit, submission_json_item['id'])
+								'?subreddit={}&link_id={}&sort=created_utc&order=asc')
+					comment_search_link = comment_search_link.format(subreddit, int(submission_json_item['id'], 36))
 
 					while comment_attempt < max_attempts and not comment_success:
 
@@ -279,13 +279,12 @@ def main():
 						else:
 							comment_success = True
 
-						with open(comment_output_path, "w") as f:
+						with open(comment_output_path, "w", encoding="utf8") as f:
 							f.write(comment_response.text)
 
 						# Have to sleep a bit here or else pushshift will start to block our requests
 						time.sleep(0.05)
-				else:
-					print(f"Comment Output Path {comment_output_path}")
+
 				# Put it into the queue to write into the database
 				q.put(comment_output_path)
 
