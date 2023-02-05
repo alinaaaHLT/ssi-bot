@@ -168,7 +168,7 @@ class LogicMixin(TaggingMixin):
 		else:
 			flair = getattr(praw_thing, 'author_flair_text')
 		if any(flair.lower().__contains__(i) for i in ['bot', 'gpt2', 'gpt']) \
-				or any(praw_thing.author.name.lower().__contains__(i) for i in ['ssi', 'bot', 'gpt2', 'gpt']):
+				or any(praw_thing.author.name.lower().__contains__(i) for i in ['ssi', 'bot', 'gpt2', 'gpt', 'Urist']):
 
 			# Adjust for when the author is a bot
 			base_probability += self._bot_author_reply_boost
@@ -207,6 +207,6 @@ class LogicMixin(TaggingMixin):
 		# calculate rate of decay over x hours
 		rate_of_decay = max(0, 1 - (age_of_submission / 24))
 		# multiply the rate of decay by the reply probability
-		#return reply_probability + reply_probability + 0.150
+		return reply_probability + reply_probability + 0.050
 		#return 0
 		return round(reply_probability * rate_of_decay, 2)
