@@ -165,7 +165,9 @@ class LogicMixin(TaggingMixin):
 		# Sometimes author_flair_text will be present but None
 		if not getattr(praw_thing, 'author_flair_text'):
 			flair = ""
-		if any(getattr(praw_thing, 'author_flair_text', '').lower().__contains__(i) for i in ['bot', 'gpt2', 'gpt']) \
+		else:
+			flair = getattr(praw_thing, 'author_flair_text')
+		if any(flair.lower().__contains__(i) for i in ['bot', 'gpt2', 'gpt']) \
 				or any(praw_thing.author.name.lower().__contains__(i) for i in ['ssi', 'bot', 'gpt2', 'gpt']):
 
 			# Adjust for when the author is a bot
