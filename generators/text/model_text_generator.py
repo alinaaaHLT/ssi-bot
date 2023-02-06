@@ -10,6 +10,7 @@ from pathlib import Path
 from configparser import ConfigParser
 
 from simpletransformers.language_generation import LanguageGenerationModel
+from transformers import pipeline
 
 from reddit_io.tagging_mixin import TaggingMixin
 from bot_db.db import Thing as db_Thing
@@ -19,6 +20,8 @@ from utils.toxicity_helper import ToxicityHelper
 
 from utils.memory import get_available_memory
 from utils import ROOT_DIR
+
+import random
 
 
 class ModelTextGenerator(threading.Thread, TaggingMixin):
@@ -110,30 +113,28 @@ class ModelTextGenerator(threading.Thread, TaggingMixin):
 	def generate_text(self, bot_username, text_generation_parameters):
 
 		model_path = ROOT_DIR / self._config[bot_username]['text_model_path']
+		#img2txt_path = ROOT_DIR / self._config[bot_username]['img2txt_model_path']
 
 		# if you are generating on CPU, keep use_cuda and fp16 both false.
 		# If you have a nvidia GPU you may enable these features
 		# TODO shift these parameters into the ssi-bot.ini file
-		model = LanguageGenerationModel("gpt2", model_path, use_cuda=self._use_gpu, args={'fp16': False})
-
+		model = LanguageGenerationModel("gpt2", model_path, use_cuda=self._use_gpu, args={'fp16': True})
+		#image_to_text = pipeline("image-to-text", model="nlpconnect/vit-gpt2-image-captioning")
 		start_time = time.time()
-
 		# pop the prompt out from the args
 		prompt = text_generation_parameters.pop('prompt', '')
 
 		output_list = model.generate(prompt=prompt, args=text_generation_parameters)
-		#output_list = output_list_tmp[0].replace('r/', 's/')
 		end_time = time.time()
 		duration = round(end_time - start_time, 1)
 
 		logging.info(f'{len(output_list)} sample(s) of text generated in {duration} seconds.')
 
-		if output_list:
-			output = output_list[0]
-			output_replaced = output.replace('r/', 's/')
-			print('TESSSSSSST: '+ output_replaced)
-			#return output_list[0]
-			return output_replaced
+		return output_list[0]
+		#	output = output_list[0]
+		#	output_replaced = output.replace('r/', 's/')
+		#	#return output_list[0]
+		#	return output_replaced
 
 	def top_pending_jobs(self):
 		"""
@@ -176,7 +177,7 @@ class ModelTextGenerator(threading.Thread, TaggingMixin):
 			# The job is to create a reply
 			# Check that is has a closing tag
 			new_text = generated_text[len(prompt):]
-			print("TEST" + new_text)
+			print(new_text)
 			if not self._end_tag in new_text:
 				logging.info("Validation failed, no end tag")
 			return self._end_tag in new_text

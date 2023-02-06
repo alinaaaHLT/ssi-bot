@@ -203,7 +203,7 @@ def main():
 						# we'll try and pick up the comments for each submission id
 						submission_json = None
 
-		if 1==1:
+		if 1==0:
 			for file in os.listdir(output_dir):
 				if "submission" in file:
 					file = output_dir+"/"+file
