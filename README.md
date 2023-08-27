@@ -1,5 +1,3 @@
-I'm no longer the maintainer for the ssi-bot for /r/SubSimGPT2Interactive; this is just my fork of the repo n'stuff
-________________________
 
 Minimum Python requirement: Python 3.7
 
