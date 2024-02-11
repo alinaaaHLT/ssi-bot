@@ -1,5 +1,5 @@
 beautifulsoup4
-detoxify==0.4.0
+detoxify==0.5.2
 nltk
 peewee
 praw
@@ -9,3 +9,4 @@ pytest
 requests
 simpletransformers==0.63.4
 torch
+ftfy
